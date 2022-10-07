@@ -21,6 +21,7 @@ Browser (client) ---> CloudFlare Worker (server)  ----> ELK (server)
 {
   "domain": "www.mumsnet.com",
   "browser": "chrome",
+  "timestamp": 1665108035,
   "bidders": [
     {
       "name": "AppNexus",
