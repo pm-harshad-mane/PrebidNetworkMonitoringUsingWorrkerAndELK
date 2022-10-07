@@ -1,4 +1,5 @@
 
+# Flow
 Browser (client) ---> CloudFlare Worker (server)  ----> ELK (server)
 
 # Prebid Network Monitoring Using Cloudflare Worker and ELK
