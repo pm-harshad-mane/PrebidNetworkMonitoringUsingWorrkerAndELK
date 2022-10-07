@@ -83,10 +83,11 @@ function handleOptions(request) {
 }
 
 async function pushDataToELK(jsonData) {
-  const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/simple-poc/_doc", {
-  // const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/nwpoc/_doc", {
+  // const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/simple-poc/_doc", {
+  const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/nwpoc/_doc", {
     "headers": {
-      "Authorization": "ApiKey dl9NRXI0TUI1SGFNR2pRTy1kcVY6XzNaZVFxNXJSR2FPOXJydm41Nm5RZw==",
+      // "Authorization": "ApiKey dl9NRXI0TUI1SGFNR2pRTy1kcVY6XzNaZVFxNXJSR2FPOXJydm41Nm5RZw==",
+      "Authorization": "ApiKey RXV0MHRJTUJEZjBXQ2N1MFJuMWk6Nnc2WHlyQ1NRdE9yYkxaTUhjZ2hoUQ==",
       "content-type": "application/json"
     },
     "body": JSON.stringify(jsonData),
