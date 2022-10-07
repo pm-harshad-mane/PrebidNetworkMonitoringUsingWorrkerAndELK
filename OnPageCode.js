@@ -110,27 +110,32 @@ var PM_Network_POC = {
     return endTime - startTime;
   },
 
-  uploadTheNetworkLatencyData: function(jsonData){
+  uploadTheNetworkLatencyData: function (jsonData) {
     fetch("https://pm-network-latency-monitoring.harshad.workers.dev/", {
-        "headers": {
-            "content-type": "application/json"
-        },
-        "method": "POST",
-        "body": JSON.stringify(jsonData)
+    // fetch("https://pm-nw-latency.nitin-shirsat.workers.dev/", {
+      "headers": {
+        "content-type": "application/json"
+      },
+      "method": "POST",
+      "body": JSON.stringify(jsonData)
     })
-    .then(res => {})
-    .then(response => {})
-    .catch(error => {});
+      .then(res => { })
+      .then(response => { })
+      .catch(error => { });
   },
 
   performNetworkAnalysis: function () {
     let output = {
       domain: PM_Network_POC.domain,
       browser: PM_Network_POC.browserName,
-      timestamp: Math.floor(Date.now() / 1000),
-      bidders: []
+      timestamp: Date.now(),
+      bidder: {},
+      nw: {
+        evaluated: {},
+        raw: {}
+      }
     };
-    
+
     let performanceResources = window?.performance?.getEntriesByType("resource");
 
     let i = PM_Network_POC.lastExecutionMaxIndex;
@@ -143,28 +148,26 @@ var PM_Network_POC = {
       ) || null;
 
       if (sspConfig) {
-        
-        let bidderOutput = {
+
+        output.bidder = {
           name: sspConfig.name,
           key: sspConfig.key
         };
-        
+
         PM_Network_POC.statHatParameters.forEach(parameter => {
           const value = PM_Network_POC.getTimeValue(
             perfResource[parameter.timeEndKey],
             perfResource[parameter.timeStartKey]
           );
           if (value > 0) {
-            bidderOutput['nw_'+parameter.key] = value;
-            // const stathatKeyToUse = `${PM_Network_POC.statHatPrefix}_${sspConfig.key}_${PM_Network_POC.browserName}_${PM_Network_POC.domain}_${parameter.key}_${PM_Network_POC.country}`;
-            // PM_Network_POC.fireStatHatPixel(stathatKeyToUse, value); // Removed parseInt function, so we can have exact decimal values in ms.
+            output.nw.evaluated['nw_' + parameter.key] = value;
           }
         });
-        
-        output.bidders.push(bidderOutput);
+
+        output.nw.raw = perfResource;
+        PM_Network_POC.uploadTheNetworkLatencyData(output);
       }
     }
-    PM_Network_POC.uploadTheNetworkLatencyData(output);
   }
 };
 
