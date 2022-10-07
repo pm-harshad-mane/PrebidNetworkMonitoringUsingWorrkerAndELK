@@ -9,18 +9,22 @@ async function handleRequest(request) {
   let response
   if (request.method === "OPTIONS") {
     response = handleOptions(request)
-  }else if (request.method === "POST") {
+  } else if (request.method === "POST") {
 
     // read the json data from post
     let dataToPush = await request.json() || {};
+    dataToPush = Object.assign(dataToPush, { "cf": {}, "location": {} });
+
     // adding extra data from request.cf to post data
     [
-        "timezone", "region", "latitude", 
-        "longitude", "continent", "city", 
-        "isEUCountry", "country", "colo"
+      "timezone", "region", "continent", "city",
+      "isEUCountry", "country", "colo"
     ].forEach(keyname => {
-        dataToPush["cf_"+keyname] = request.cf[keyname]
-    })
+      dataToPush.cf[keyname] = request.cf[keyname]
+    });
+
+    dataToPush.location["lat"] = parseFloat(request.cf.latitude);
+    dataToPush.location["lon"] = parseFloat(request.cf.longitude);
 
     await pushDataToELK(dataToPush);
     const data = {};
@@ -46,7 +50,7 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 }
 
-function handleOptions (request) {
+function handleOptions(request) {
   // Make sure the necessary headers are present
   // for this to be a valid pre-flight request
   let headers = request.headers
@@ -55,31 +59,32 @@ function handleOptions (request) {
     headers.get("Access-Control-Request-Method") !== null &&
     headers.get("Access-Control-Request-Headers") !== null
   ) {
-      // Handle CORS pre-flight request.
-      // If you want to check or reject the requested method + headers
-      // you can do that here.
-      let respHeaders = {
-        ...corsHeaders,
-        // Allow all future content Request headers to go back to browser
-        // such as Authorization (Bearer) or X-Client-Name-Version
-        "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers"),
-      }
-      return new Response(null, {
-        headers: respHeaders,
-      })
+    // Handle CORS pre-flight request.
+    // If you want to check or reject the requested method + headers
+    // you can do that here.
+    let respHeaders = {
+      ...corsHeaders,
+      // Allow all future content Request headers to go back to browser
+      // such as Authorization (Bearer) or X-Client-Name-Version
+      "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers"),
+    }
+    return new Response(null, {
+      headers: respHeaders,
+    })
   } else {
     // Handle standard OPTIONS request.
     // If you want to allow other HTTP Methods, you can do that here.
     return new Response(null, {
       headers: {
-              Allow: "GET, HEAD, POST, OPTIONS",
+        Allow: "GET, HEAD, POST, OPTIONS",
       },
     })
   }
 }
 
-async function pushDataToELK(jsonData){
+async function pushDataToELK(jsonData) {
   const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/simple-poc/_doc", {
+  // const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/nwpoc/_doc", {
     "headers": {
       "Authorization": "ApiKey dl9NRXI0TUI1SGFNR2pRTy1kcVY6XzNaZVFxNXJSR2FPOXJydm41Nm5RZw==",
       "content-type": "application/json"
