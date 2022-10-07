@@ -9,7 +9,7 @@ var PM_Network_POC = {
   //    else, try changing namespace with pbjs (code: window.pbjs)   
   //    3.2 In case of IDHUB only, use code, window.ihowpbjs
   // 4. Or connect to JS developer
-  
+
   'prebidNamespace': 'pbjs',
 
   // N second after auction end, get the stats for given domains
@@ -112,7 +112,6 @@ var PM_Network_POC = {
 
   uploadTheNetworkLatencyData: function (jsonData) {
     fetch("https://pm-network-latency-monitoring.harshad.workers.dev/", {
-    // fetch("https://pm-nw-latency.nitin-shirsat.workers.dev/", {
       "headers": {
         "content-type": "application/json"
       },
