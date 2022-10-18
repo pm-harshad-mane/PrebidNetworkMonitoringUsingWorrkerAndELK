@@ -12,6 +12,8 @@ var PM_Network_POC = {
 
   'prebidNamespace': 'pbjs',
 
+  'publisherId': 1234,
+
   // N second after auction end, get the stats for given domains
   'executionDelayInMs': 2000,
 
@@ -126,6 +128,7 @@ var PM_Network_POC = {
   performNetworkAnalysis: function () {
     let output = {
       domain: PM_Network_POC.domain,
+      publisherId: PM_Network_POC.publisherId,
       browser: PM_Network_POC.browserName,
       timestamp: Date.now(),
       bidder: {},
