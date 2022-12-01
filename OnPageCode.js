@@ -1,135 +1,69 @@
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// START device detection logic
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+function getDeviceType () {
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const device = {};
 
-const device = {};
-
-// android
-device.android = function() {
-  return !device.windows() && find('android');
-};
-
-device.androidPhone = function() {
-  return device.android() && find('mobile');
-};
-
-device.androidTablet = function() {
-  return device.android() && !find('mobile');
-};
-
-// apple
-device.iphone = function() {
-  return !device.windows() && find('iphone');
-};
-
-device.ipod = function() {
-  return find('ipod');
-};
-
-device.ipad = function() {
-  const iPadOS13Up =
-    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-  return find('ipad') || iPadOS13Up;
-};
-
-// windows
-device.windows = function() {
-  return find('windows');
-};
-
-device.windowsPhone = function() {
-  return device.windows() && find('phone');
-};
-
-device.windowsTablet = function() {
-  return device.windows() && (find('touch') && !device.windowsPhone());
-};
-
-// blackberry
-device.blackberry = function() {
-  return find('blackberry') || find('bb10');
-};
-
-device.blackberryPhone = function() {
-  return device.blackberry() && !find('tablet');
-};
-
-device.blackberryTablet = function() {
-  return device.blackberry() && find('tablet');
-};
-
-// fx
-device.fxos = function() {
-  return (find('(mobile') || find('(tablet')) && find(' rv:');
-};
-
-device.fxosPhone = function() {
-  return device.fxos() && find('mobile');
-};
-
-device.fxosTablet = function() {
-  return device.fxos() && find('tablet');
-};
-
-// meego
-device.meego = function() {
-  return find('meego');
-};
-
-// mobile
-device.mobile = function() {
-  return (
-    device.androidPhone() ||
-    device.iphone() ||
-    device.ipod() ||
-    device.windowsPhone() ||
-    device.blackberryPhone() ||
-    device.fxosPhone() ||
-    device.meego()
-  );
-};
-
-// tablet
-device.tablet = function() {
-  return (
-    device.ipad() ||
-    device.androidTablet() ||
-    device.blackberryTablet() ||
-    device.windowsTablet() ||
-    device.fxosTablet()
-  );
-};
-
-device.desktop = function() {
-  return !device.tablet() && !device.mobile();
-};
-
-// The client user agent string.
-// Lowercase, so we can use the more efficient indexOf(), instead of Regex
-const userAgent = window.navigator.userAgent.toLowerCase();
-
-function findMatch(arr) {
-  for (let i = 0; i < arr.length; i++) {
-    if (device[arr[i]]()) {
-      return arr[i]
+  function findMatch(arr) {
+    for (let i = 0; i < arr.length; i++) {
+      if (device[arr[i]]()) {
+        return arr[i]
+      }
     }
-  }
-  return 'others';
-};
+    return 'others';
+  };
 
-// Simple UA string search
-function find(needle) {
-  return includes(userAgent, needle);
-};
+  function find(needle) {
+    return includes(userAgent, needle);
+  };
 
-// Check if element exists
-function includes(haystack, needle) {
-  return haystack.indexOf(needle) !== -1;
-};
+  function includes(haystack, needle) {
+    return haystack.indexOf(needle) !== -1;
+  };
 
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// END device detection logic
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // android
+  device.android = function() {
+    return !device.windows() && find('android');
+  };
+
+  device.androidPhone = function() {
+    return device.android() && find('mobile');
+  };
+
+  device.androidTablet = function() {
+    return device.android() && !find('mobile');
+  };
+
+  // apple
+  device.iphone = function() {
+    return !device.windows() && find('iphone');
+  };
+
+  device.ipad = function() {
+    const iPadOS13Up =
+      navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+    return find('ipad') || iPadOS13Up;
+  };
+
+  // windows
+  device.windows = function() {
+    return find('windows');
+  };
+
+  // mobile
+  device.mobile = function() {
+    return device.androidPhone() || device.iphone();
+  };
+
+  // tablet
+  device.tablet = function() {
+    return device.ipad() || device.androidTablet();
+  };
+
+  device.desktop = function() {
+    return !device.tablet() && !device.mobile();
+  };
+
+  return findMatch(['mobile', 'tablet', 'desktop']);
+};
 
 var PM_Network_POC = {
 
@@ -235,8 +169,8 @@ var PM_Network_POC = {
     if (userAgent.match(/edg/i)) return "edge";
     return "others";
   })(),
-  'device': (function () {
-    return findMatch(['mobile', 'tablet', 'desktop']);
+  'platform': (function () {
+    return getDeviceType();
   })(),
 
   // to make sure that we do not read the stats for the same network call again
