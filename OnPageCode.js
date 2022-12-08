@@ -125,7 +125,18 @@ var PM_Network_POC = {
       .catch(error => { });
   },
 
-  performNetworkAnalysis: function () {
+  getParameterByName: function (name, url) {
+    name = name.replace(/[\[\]]/g, '\\$&');
+    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+      results = regex.exec(url);
+    if (!results)
+      return null;
+    if (!results[2])
+      return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  },
+
+  prepareNetworkLatencyData: function (perfResource, sspConfig, timelines) {
     let output = {
       domain: PM_Network_POC.domain,
       publisherId: PM_Network_POC.publisherId,
@@ -135,11 +146,31 @@ var PM_Network_POC = {
       nw: {
         evaluated: {},
         raw: {}
-      }
+      },
+      serverTimelines: timelines
     };
 
-    let performanceResources = window?.performance?.getEntriesByType("resource");
+    output.bidder = {
+      name: sspConfig.name,
+      key: sspConfig.key
+    };
 
+    PM_Network_POC.statHatParameters.forEach(parameter => {
+      const value = PM_Network_POC.getTimeValue(
+        perfResource[parameter.timeEndKey],
+        perfResource[parameter.timeStartKey]
+      );
+      if (value > 0) {
+        output.nw.evaluated['nw_' + parameter.key] = value;
+      }
+    });
+
+    output.nw.raw = perfResource;
+    PM_Network_POC.uploadTheNetworkLatencyData(output);
+  },
+
+  performNetworkAnalysis: function (timelines, uniqueId) {
+    let performanceResources = window?.performance?.getEntriesByType("resource");
     let i = PM_Network_POC.lastExecutionMaxIndex;
     for (; i < performanceResources.length; i++) {
       let perfResource = performanceResources[i];
@@ -150,24 +181,14 @@ var PM_Network_POC = {
       ) || null;
 
       if (sspConfig) {
-
-        output.bidder = {
-          name: sspConfig.name,
-          key: sspConfig.key
-        };
-
-        PM_Network_POC.statHatParameters.forEach(parameter => {
-          const value = PM_Network_POC.getTimeValue(
-            perfResource[parameter.timeEndKey],
-            perfResource[parameter.timeStartKey]
-          );
-          if (value > 0) {
-            output.nw.evaluated['nw_' + parameter.key] = value;
+        if(sspConfig.key === 'pm') {
+          const value = PM_Network_POC.getParameterByName("uniqueReqId", perfResource.name);
+          if(value == uniqueId) {
+            PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, timelines);
           }
-        });
-
-        output.nw.raw = perfResource;
-        PM_Network_POC.uploadTheNetworkLatencyData(output);
+        } else {
+          PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, {});
+        }
       }
     }
   }
@@ -184,10 +205,12 @@ window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
       var randomNumberBelow100 = Math.floor(Math.random() * 100);
       if (randomNumberBelow100 <= PM_Network_POC.testGroupPercentage) {
-        setTimeout(
-          PM_Network_POC.performNetworkAnalysis,
-          PM_Network_POC.executionDelayInMs
-        );
+        let meta = data.bidsReceived.find(bid => bid.bidder === 'pubmatic')?.meta;
+        // setTimeout(
+        //   PM_Network_POC.performNetworkAnalysis,
+        //   PM_Network_POC.executionDelayInMs
+        // );
+        PM_Network_POC.performNetworkAnalysis(meta?.timelines, meta?.uniqueReqId);
       }
     });
   } else {
