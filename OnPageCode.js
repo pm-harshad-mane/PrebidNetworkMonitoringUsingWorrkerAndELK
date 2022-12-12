@@ -169,7 +169,7 @@ var PM_Network_POC = {
     PM_Network_POC.uploadTheNetworkLatencyData(output);
   },
 
-  performNetworkAnalysis: function (timelines, uniqueId) {
+  performNetworkAnalysis: function (timelines, uniqueReqId) {
     let performanceResources = window?.performance?.getEntriesByType("resource");
     let i = PM_Network_POC.lastExecutionMaxIndex;
     for (; i < performanceResources.length; i++) {
@@ -183,7 +183,7 @@ var PM_Network_POC = {
       if (sspConfig) {
         if(sspConfig.key === 'pm') {
           const value = PM_Network_POC.getParameterByName("uniqueReqId", perfResource.name);
-          if(value == uniqueId) {
+          if(value == uniqueReqId) {
             PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, timelines);
           }
         } else {
@@ -205,12 +205,12 @@ window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
       var randomNumberBelow100 = Math.floor(Math.random() * 100);
       if (randomNumberBelow100 <= PM_Network_POC.testGroupPercentage) {
-        let meta = data.bidsReceived.find(bid => bid.bidder === 'pubmatic')?.meta;
+        const bid = data.bidsReceived.find(bid => bid.bidder === 'pubmatic');
         // setTimeout(
         //   PM_Network_POC.performNetworkAnalysis,
         //   PM_Network_POC.executionDelayInMs
         // );
-        PM_Network_POC.performNetworkAnalysis(meta?.timelines, meta?.uniqueReqId);
+        PM_Network_POC.performNetworkAnalysis(bid?.ext?.timelines, bid?.ext?.uniqueReqId);
       }
     });
   } else {
