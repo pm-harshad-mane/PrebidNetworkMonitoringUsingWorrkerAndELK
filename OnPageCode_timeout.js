@@ -72,7 +72,7 @@ var PM_Network_POC = {
     },
     {
       key: "pm",
-      name: "PubMatic",
+      name: "PubMatic_GET",
       bidderCode: "pubmatic",
       searchName: "openbidtest-ams.pubmatic.com"
     },
@@ -163,7 +163,7 @@ var PM_Network_POC = {
       serverLatency: latency || {},
       requestUrlPayloadLength: bidderRequest?.requestUrlPayloadLength,
       t: PM_Network_POC.timeoutCorrelators[bidderRequest?.correlator] ? 1 : 0,
-      resReceived: perfResource?.name?.length ? 1 : 0
+      db: perfResource?.name?.length ? 1 : 0
     };
 
     output.bidder = {
