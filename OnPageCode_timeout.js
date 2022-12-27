@@ -1,4 +1,3 @@
-
 var PM_Network_POC = {
 
   'timeoutCorrelators': {},
@@ -68,13 +67,15 @@ var PM_Network_POC = {
       key: "pm",
       name: "PubMatic",
       bidderCode: "pubmatic",
-      searchName: "hbopenbid.pubmatic.com"
+      searchName: "hbopenbid.pubmatic.com",
+      reqMethod: 'POST'
     },
     {
       key: "pm",
       name: "PubMatic_GET",
       bidderCode: "pubmatic",
-      searchName: "openbidtest-ams.pubmatic.com"
+      searchName: "openbidtest-ams.pubmatic.com",
+      reqMethod: 'GET'
     },
     {
       key: "an",
@@ -161,9 +162,9 @@ var PM_Network_POC = {
         raw: {}
       },
       serverLatency: latency || {},
-      requestUrlPayloadLength: bidderRequest?.requestUrlPayloadLength,
-      t: PM_Network_POC.timeoutCorrelators[bidderRequest?.correlator] ? 1 : 0,
-      db: perfResource?.name?.length ? 1 : 0
+      requestUrlPayloadLength: bidderRequest?.nwMonitor?.requestUrlPayloadLength,
+      t: PM_Network_POC.timeoutCorrelators[bidderRequest?.nwMonitor?.correlator] ? 1 : 0,
+      db: perfResource?.name?.length ? 0 : 1
     };
 
     output.bidder = {
@@ -185,20 +186,30 @@ var PM_Network_POC = {
     PM_Network_POC.uploadTheNetworkLatencyData(output);
   },
 
-  performNetworkAnalysis: function (bidderRequests, ext) {
+  isPubMaticBidder: function (bidderCode) {
+    return bidderCode === 'pubmatic';
+  },
+
+  getBidderByBidRequest: function (bidderRequest) {
+    return PM_Network_POC.bidders.find(bidder => {
+      if (PM_Network_POC.isPubMaticBidder(bidder.bidderCode)) {
+        return bidder.bidderCode === bidderRequest.bidderCode &&
+          bidder.reqMethod === bidderRequest?.nwMonitor?.reqMethod;
+      }
+      return bidder.bidderCode === bidderRequest.bidderCode;
+    });
+  },
+
+  performNetworkAnalysis: function (bidderRequests, bidsReceived) {
+    const bidReceived = bidsReceived?.find(bidReceived => PM_Network_POC.isPubMaticBidder(bidReceived?.bidderCode));
     //latency = latency || {};
     let performanceResources = window?.performance?.getEntriesByType("resource");
     let lastExecutionIndex = PM_Network_POC.lastExecutionMaxIndex;
     PM_Network_POC.lastExecutionMaxIndex = performanceResources.length;
 
-    const bidders = PM_Network_POC.bidders.filter(bidder => {
-      const bidderRequest = bidderRequests?.find(bidderRequest => bidderRequest.bidderCode === bidder.bidderCode);
-      if (bidderRequest) return { ...bidderRequest, ...bidder };
-    });
-
     for (let index = 0; index < bidderRequests.length; index++) {
       const bidderRequest = bidderRequests[index];
-      let sspConfig = PM_Network_POC.bidders.find(bidder => bidder.bidderCode === bidderRequest.bidderCode);
+      let sspConfig = PM_Network_POC.getBidderByBidRequest(bidderRequest);
       if (!sspConfig) break;
 
       let perfResourceFound = false;
@@ -206,11 +217,11 @@ var PM_Network_POC = {
         let perfResource = performanceResources[i];
 
         if (perfResource.name.includes(sspConfig.searchName)) {
-          if (sspConfig.key === 'pm') {
+          if (PM_Network_POC.isPubMaticBidder(sspConfig.bidderCode)) {
             const value = PM_Network_POC.getParameterByName("correlator", perfResource.name);
-            if (value == bidderRequest.correlator) {
+            if (value == bidderRequest?.nwMonitor?.correlator) {
               perfResourceFound = true;
-              PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, bidderRequest, ext?.latency);
+              PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, bidderRequest, bidReceived?.ext?.latency);
               break;
             }
             // else {
@@ -224,7 +235,7 @@ var PM_Network_POC = {
         }
       }
       if (perfResourceFound === false) {
-        PM_Network_POC.prepareNetworkLatencyData({}, sspConfig, bidderRequest);
+        PM_Network_POC.prepareNetworkLatencyData({}, sspConfig, bidderRequest, null);
       }
     }
   }
@@ -245,9 +256,8 @@ window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
       var randomNumberBelow100 = Math.floor(Math.random() * 100);
       if (randomNumberBelow100 <= PM_Network_POC.testGroupPercentage) {
-				const bidReceived = data?.bidsReceived?.find(bidReceived => bidReceived?.bidderCode === 'pubmatic');
         setTimeout(
-          PM_Network_POC.performNetworkAnalysis.bind(null, data?.bidderRequests, bidReceived?.ext),
+          PM_Network_POC.performNetworkAnalysis.bind(null, data?.bidderRequests, data?.bidsReceived),
           PM_Network_POC.executionDelayInMs
         );
         //PM_Network_POC.performNetworkAnalysis(bid?.ext?.latency, bid?.ext?.correlator);
