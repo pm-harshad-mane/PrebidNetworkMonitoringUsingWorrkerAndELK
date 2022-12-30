@@ -214,8 +214,6 @@
 
     uploadTheNetworkLatencyData: function (jsonData) {
       jsonData.cf = JSON.parse(window.localStorage.getItem('cf'));
-      // eslint-disable-next-line no-console
-      console.log('jsonData: ', jsonData);
       PM_Network_POC.reset();
       PM_Network_POC.pushDataToELK(jsonData);
     },
