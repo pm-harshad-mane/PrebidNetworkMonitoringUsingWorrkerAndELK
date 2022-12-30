@@ -89,6 +89,10 @@
     // run the Network analysis only for the mentioned percentage of traffic
     'testGroupPercentage': 100,
 
+    'cache': {
+      auction: {}
+    },
+
     'statHatParameters': [
       {
         key: 'dns',
@@ -125,12 +129,6 @@
         name: 'Duration',
         timeEndKey: 'responseEnd',
         timeStartKey: 'startTime'
-      },
-      {
-        key: 'per_lt',
-        name: 'Perceived Latency',
-        timeEndKey: 'responseEnd',
-        timeStartKey: 'fetchStart'
       }
     ],
 
@@ -141,6 +139,10 @@
     'order': 0,
 
     'adUnitCount': 0,
+
+    'setAuctionStartTime': function (args) {
+      PM_Network_POC.cache.auction.timestamp = args.timestamp;
+    },
 
     // need to log domain in stats
     'domain': (function () {
@@ -169,7 +171,7 @@
     // to make sure that we do not read the stats for the same network call again
     'lastExecutionMaxIndex': 0,
 
-    'networkType': navigator.connection.effectiveType,
+    'networkType': navigator?.connection?.effectiveType,
 
     getTimeValue: function (endTime, startTime) {
       if (isNaN(endTime) || isNaN(startTime)) return -1;
@@ -177,18 +179,45 @@
       return endTime - startTime;
     },
 
-    uploadTheNetworkLatencyData: function (jsonData) {
-      PM_Network_POC.reset();
-      fetch('https://pm-network-latency-monitoring.harshad.workers.dev/', {
+    pushDataToELK: async (jsonData) => {
+      // const fetchResponse = await fetch("https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/simple-poc/_doc", {
+      const fetchResponse = await fetch('https://528a4d5f7065437ba453fbd88a3fa021.us-central1.gcp.cloud.es.io:443/nwpoc/_doc', {
         'headers': {
+          // "Authorization": "ApiKey dl9NRXI0TUI1SGFNR2pRTy1kcVY6XzNaZVFxNXJSR2FPOXJydm41Nm5RZw==",
+          'Authorization': 'ApiKey RXV0MHRJTUJEZjBXQ2N1MFJuMWk6Nnc2WHlyQ1NRdE9yYkxaTUhjZ2hoUQ==',
           'content-type': 'application/json'
         },
-        'method': 'POST',
-        'body': JSON.stringify(jsonData)
-      })
-        .then(res => { })
-        .then(response => { })
-        .catch(() => { });
+        'body': JSON.stringify(jsonData),
+        'method': 'POST'
+      });
+      // eslint-disable-next-line no-console
+      console.log('fetchResponse: ', fetchResponse);
+    },
+
+    fetchGeoData: () => {
+      const cfFromLs = JSON.parse(window.localStorage.getItem('cf'));
+      const ONE_DAY = 86400000;
+
+      if (!cfFromLs || (new Date() - new Date(cfFromLs.timestamp) > ONE_DAY)) {
+        fetch('https://crimson-feather-b770.jason-quaccia.workers.dev')
+          .then(response => {
+            return response.json();
+          }).then(cfData => {
+            cfData.timestamp = Date.now();
+            window.localStorage.setItem('cf', JSON.stringify(cfData));
+            return cfData;
+          });
+      } else {
+        return cfFromLs;
+      }
+    },
+
+    uploadTheNetworkLatencyData: function (jsonData) {
+      jsonData.cf = JSON.parse(window.localStorage.getItem('cf'));
+      // eslint-disable-next-line no-console
+      console.log('jsonData: ', jsonData);
+      PM_Network_POC.reset();
+      PM_Network_POC.pushDataToELK(jsonData);
     },
 
     reset: function () {
@@ -202,11 +231,12 @@
         publisherId: PM_Network_POC.publisherId,
         browser: PM_Network_POC.browserName,
         platform: PM_Network_POC.platform,
-        networkType: PM_Network_POC.networkType,
         adUnitCount: PM_Network_POC.adUnitCount,
         timestamp: Date.now(),
-        bidders: []
+        bidder: []
       };
+
+      if (PM_Network_POC.networkType) outputObj['networkType'] = PM_Network_POC.networkType
 
       let performanceResources = window?.performance?.getEntriesByType('resource');
 
@@ -232,10 +262,12 @@
           let nwObj = {
             method: sspConfig.method,
             reqPayloadCharCount: sspConfig.reqPayloadCharCount,
-            resUsedInPbjsAuction: PM_Network_POC.bidderTracker[sspConfig.name] ? (PM_Network_POC.bidderTracker[sspConfig.name].resUsedInPbjsAuction || 0) : 0,
+            resUsedInPbjsAuction: PM_Network_POC.bidderTracker[sspConfig.name] ? (PM_Network_POC.bidderTracker[sspConfig.name].resUsedInPbjsAuction || false) : false,
             order: sspConfig.order,
             nw: {
-              evaluated: {},
+              evaluated: {
+                per_lt: Date.now() - PM_Network_POC.cache.auction.timestamp
+              },
               raw: {}
             }
           }
@@ -252,19 +284,18 @@
 
           nwObj.nw.raw = perfResource;
 
-          duplicate = outputObj.bidders.find(
+          duplicate = outputObj.bidder.find(
             bidder => sspConfig.name === bidder.name
           ) || null;
 
           if (!duplicate) {
             biddersObj = {
               name: sspConfig.name,
-              // key: sspConfig.key
               callCount: 1,
               calls: []
             };
             biddersObj.calls.push(nwObj);
-            outputObj.bidders.push(biddersObj);
+            outputObj.bidder.push(biddersObj);
           } else {
             duplicate.callCount++;
             duplicate.calls.push(nwObj);
@@ -273,8 +304,13 @@
           PM_Network_POC.bidders.splice(currentIndex, 1);
         }
 
-        if (i === performanceResources.length - 1 && outputObj.bidders.length > 0) {
-          PM_Network_POC.uploadTheNetworkLatencyData(outputObj);
+        if (i === performanceResources.length - 1 && outputObj.bidder.length > 0) {
+          outputObj.bidder.forEach(bidder => {
+            const bidderSpecificObj = Object.assign({}, outputObj);
+            bidderSpecificObj.bidder = bidder;
+            bidderSpecificObj.totalBiddersInAuction = Object.keys(PM_Network_POC.bidderTracker).length;
+            PM_Network_POC.uploadTheNetworkLatencyData(bidderSpecificObj);
+          });
         }
       }
     }
@@ -291,6 +327,7 @@
 
   window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
     if (typeof window[PM_NW_POC_PREBID_NAMESPACE].onEvent === 'function') {
+      PM_Network_POC.fetchGeoData();
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('beforeBidderHttp', (bidderRequest, requestObject) => {
         PM_Network_POC.order++;
         PM_Network_POC.bidders.push({
@@ -312,8 +349,12 @@
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('bidResponse', (bidResponse) => {
         const bidderKeys = Object.keys(PM_Network_POC.bidderTracker);
         if (bidderKeys.indexOf(bidResponse.bidderCode) !== -1) {
-          PM_Network_POC.bidderTracker[bidResponse.bidderCode].resUsedInPbjsAuction = 1;
+          PM_Network_POC.bidderTracker[bidResponse.bidderCode].resUsedInPbjsAuction = true;
         }
+      });
+
+      window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionInit', data => {
+        PM_Network_POC.setAuctionStartTime(data);
       });
 
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
