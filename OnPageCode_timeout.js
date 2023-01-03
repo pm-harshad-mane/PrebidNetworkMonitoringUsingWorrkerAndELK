@@ -205,7 +205,7 @@ var PM_Network_POC = {
     //latency = latency || {};
     let performanceResources = window?.performance?.getEntriesByType("resource");
     let lastExecutionIndex = PM_Network_POC.lastExecutionMaxIndex;
-    PM_Network_POC.lastExecutionMaxIndex = performanceResources.length;
+    //PM_Network_POC.lastExecutionMaxIndex = performanceResources.length;
 
     for (let index = 0; index < bidderRequests.length; index++) {
       const bidderRequest = bidderRequests[index];
@@ -217,6 +217,7 @@ var PM_Network_POC = {
         let perfResource = performanceResources[i];
 
         if (perfResource.name.includes(sspConfig.searchName)) {
+          PM_Network_POC.lastExecutionMaxIndex = i;
           if (PM_Network_POC.isPubMaticBidder(sspConfig.bidderCode)) {
             const value = PM_Network_POC.getParameterByName("correlator", perfResource.name);
             if (value == bidderRequest?.nwMonitor?.correlator) {
