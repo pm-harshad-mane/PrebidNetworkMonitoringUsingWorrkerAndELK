@@ -1,5 +1,7 @@
 var PM_Network_POC = {
 
+  'timeoutCorrelators': {},
+
   // IMP: Which namespace to be used, can be identify using,
   // 1. Go to publisher URL.
   // 2. Open developer tool and select console tab
@@ -10,7 +12,7 @@ var PM_Network_POC = {
   //    3.2 In case of IDHUB only, use code, window.ihowpbjs
   // 4. Or connect to JS developer
 
-  'prebidNamespace': 'pbjs',
+  'prebidNamespace': 'owpbjs',
 
   'publisherId': 1234,
 
@@ -64,21 +66,33 @@ var PM_Network_POC = {
     {
       key: "pm",
       name: "PubMatic",
-      searchName: "hbopenbid.pubmatic.com"
+      bidderCode: "pubmatic",
+      searchName: "hbopenbid.pubmatic.com",
+      reqMethod: 'POST'
     },
     {
-      key: "tl",
-      name: "TripleLift",
-      searchName: "tlx.3lift.com"
+      key: "pm",
+      name: "PubMatic_GET",
+      bidderCode: "pubmatic",
+      searchName: "openbidtest-ams.pubmatic.com",
+      reqMethod: 'GET'
     },
     {
       key: "an",
       name: "AppNexus",
+      bidderCode: "appnexus",
       searchName: "ib.adnxs.com"
+    },
+    {
+      key: "tl",
+      name: "TripleLift",
+      bidderCode: "triplelift",
+      searchName: "tlx.3lift.com"
     },
     {
       key: "rc",
       name: "Rubicon",
+      bidderCode: "rubicon",
       searchName: "fastlane.rubiconproject.com"
     }
   ],
@@ -136,7 +150,7 @@ var PM_Network_POC = {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
   },
 
-  prepareNetworkLatencyData: function (perfResource, sspConfig, timelines) {
+  prepareNetworkLatencyData: function (perfResource, sspConfig, bidderRequest, latency) {
     let output = {
       domain: PM_Network_POC.domain,
       publisherId: PM_Network_POC.publisherId,
@@ -147,7 +161,10 @@ var PM_Network_POC = {
         evaluated: {},
         raw: {}
       },
-      serverTimelines: timelines
+      serverLatency: latency || {},
+      requestUrlPayloadLength: bidderRequest?.nwMonitor?.requestUrlPayloadLength,
+      t: PM_Network_POC.timeoutCorrelators[bidderRequest?.nwMonitor?.correlator] ? 1 : 0,
+      db: perfResource?.name?.length ? 0 : 1
     };
 
     output.bidder = {
@@ -169,26 +186,57 @@ var PM_Network_POC = {
     PM_Network_POC.uploadTheNetworkLatencyData(output);
   },
 
-  performNetworkAnalysis: function (timelines, uniqueReqId) {
+  isPubMaticBidder: function (bidderCode) {
+    return bidderCode === 'pubmatic';
+  },
+
+  getBidderByBidRequest: function (bidderRequest) {
+    return PM_Network_POC.bidders.find(bidder => {
+      if (PM_Network_POC.isPubMaticBidder(bidder.bidderCode)) {
+        return bidder.bidderCode === bidderRequest.bidderCode &&
+          bidder.reqMethod === bidderRequest?.nwMonitor?.reqMethod;
+      }
+      return bidder.bidderCode === bidderRequest.bidderCode;
+    });
+  },
+
+  performNetworkAnalysis: function (bidderRequests, bidsReceived) {
+    const bidReceived = bidsReceived?.find(bidReceived => PM_Network_POC.isPubMaticBidder(bidReceived?.bidderCode));
+    //latency = latency || {};
     let performanceResources = window?.performance?.getEntriesByType("resource");
-    let i = PM_Network_POC.lastExecutionMaxIndex;
-    for (; i < performanceResources.length; i++) {
-      let perfResource = performanceResources[i];
-      PM_Network_POC.lastExecutionMaxIndex++;
+    let lastExecutionIndex = PM_Network_POC.lastExecutionMaxIndex;
+    //PM_Network_POC.lastExecutionMaxIndex = performanceResources.length;
 
-      let sspConfig = PM_Network_POC.bidders.find(
-        bidder => perfResource.name.includes(bidder.searchName)
-      ) || null;
+    for (let index = 0; index < bidderRequests.length; index++) {
+      const bidderRequest = bidderRequests[index];
+      let sspConfig = PM_Network_POC.getBidderByBidRequest(bidderRequest);
+      if (!sspConfig) break;
 
-      if (sspConfig) {
-        if(sspConfig.key === 'pm') {
-          const value = PM_Network_POC.getParameterByName("uniqueReqId", perfResource.name);
-          if(value == uniqueReqId) {
-            PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, timelines);
+      let perfResourceFound = false;
+      for (let i = lastExecutionIndex; i < performanceResources.length; i++) {
+        let perfResource = performanceResources[i];
+
+        if (perfResource.name.includes(sspConfig.searchName)) {
+          PM_Network_POC.lastExecutionMaxIndex = i;
+          if (PM_Network_POC.isPubMaticBidder(sspConfig.bidderCode)) {
+            const value = PM_Network_POC.getParameterByName("correlator", perfResource.name);
+            if (value == bidderRequest?.nwMonitor?.correlator) {
+              perfResourceFound = true;
+              PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, bidderRequest, bidReceived?.ext?.latency);
+              break;
+            }
+            // else {
+            //   PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, null);
+            // }
+          } else {
+            perfResourceFound = true;
+            PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, {}, null);
+            break;
           }
-        } else {
-          PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, {});
         }
+      }
+      if (perfResourceFound === false) {
+        PM_Network_POC.prepareNetworkLatencyData({}, sspConfig, bidderRequest, null);
       }
     }
   }
@@ -202,15 +250,18 @@ window[PM_NW_POC_PREBID_NAMESPACE] = window[PM_NW_POC_PREBID_NAMESPACE] || {};
 window[PM_NW_POC_PREBID_NAMESPACE].que = window[PM_NW_POC_PREBID_NAMESPACE].que || [];
 window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
   if (typeof window[PM_NW_POC_PREBID_NAMESPACE].onEvent === 'function') {
+    window[PM_NW_POC_PREBID_NAMESPACE].onEvent('bidTimeout', function (args) {
+      let uniqueBiddersBids = [...new Map(args.map(item => [item['bidder'], item])).values()];
+      uniqueBiddersBids?.forEach(bid => PM_Network_POC.timeoutCorrelators[bid.correlator] = 1);
+    });
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
       var randomNumberBelow100 = Math.floor(Math.random() * 100);
       if (randomNumberBelow100 <= PM_Network_POC.testGroupPercentage) {
-        const bid = data.bidsReceived.find(bid => bid.bidder === 'pubmatic');
-        // setTimeout(
-        //   PM_Network_POC.performNetworkAnalysis,
-        //   PM_Network_POC.executionDelayInMs
-        // );
-        PM_Network_POC.performNetworkAnalysis(bid?.ext?.timelines, bid?.ext?.uniqueReqId);
+        setTimeout(
+          PM_Network_POC.performNetworkAnalysis.bind(null, data?.bidderRequests, data?.bidsReceived),
+          PM_Network_POC.executionDelayInMs
+        );
+        //PM_Network_POC.performNetworkAnalysis(bid?.ext?.latency, bid?.ext?.correlator);
       }
     });
   } else {
