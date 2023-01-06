@@ -71,8 +71,9 @@ var PM_Network_POC = {
       //reqMethod: 'POST'
     },
     {
+      // NOTE: This Object will replace dyanmically depends on dynamic change in translator endpoint config
       key: "pm",
-      name: "PubMatic_GET",
+      name: "PubMatic",
       bidderCode: "pubmatic",
       searchName: "openbidtest-ams.pubmatic.com",
       //reqMethod: 'GET'
