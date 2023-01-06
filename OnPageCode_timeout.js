@@ -68,14 +68,14 @@ var PM_Network_POC = {
       name: "PubMatic",
       bidderCode: "pubmatic",
       searchName: "hbopenbid.pubmatic.com",
-      reqMethod: 'POST'
+      //reqMethod: 'POST'
     },
     {
       key: "pm",
       name: "PubMatic_GET",
       bidderCode: "pubmatic",
       searchName: "openbidtest-ams.pubmatic.com",
-      reqMethod: 'GET'
+      //reqMethod: 'GET'
     },
     {
       key: "an",
@@ -150,13 +150,20 @@ var PM_Network_POC = {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
   },
 
-  prepareNetworkLatencyData: function (perfResource, sspConfig, bidderRequest, latency) {
+  prepareNetworkLatencyData: function (perfResource, bidderRequest, latency) {
     let output = {
       domain: PM_Network_POC.domain,
       publisherId: PM_Network_POC.publisherId,
       browser: PM_Network_POC.browserName,
       timestamp: Date.now(),
-      bidder: {},
+      bidder: {
+        name: bidderRequest.bidderCode,
+        request: {
+          method: bidderRequest?.nwMonitor?.reqMethod,
+          isOverride: bidderRequest?.nwMonitor?.reqOverride,
+          endPoint: bidderRequest?.nwMonitor?.reqEndPoint
+        }
+      },
       nw: {
         evaluated: {},
         raw: {}
@@ -167,10 +174,10 @@ var PM_Network_POC = {
       db: perfResource?.name?.length ? 0 : 1
     };
 
-    output.bidder = {
-      name: sspConfig.name,
-      key: sspConfig.key
-    };
+    // output.bidder = {
+    //   name: sspConfig.name,
+    //   key: sspConfig.key
+    // };
 
     PM_Network_POC.statHatParameters.forEach(parameter => {
       const value = PM_Network_POC.getTimeValue(
@@ -190,13 +197,13 @@ var PM_Network_POC = {
     return bidderCode === 'pubmatic';
   },
 
-  getBidderByBidRequest: function (bidderRequest) {
+  getBidder: function (bidderRequest, perfName) {
     return PM_Network_POC.bidders.find(bidder => {
-      if (PM_Network_POC.isPubMaticBidder(bidder.bidderCode)) {
-        return bidder.bidderCode === bidderRequest.bidderCode &&
-          bidder.reqMethod === bidderRequest?.nwMonitor?.reqMethod;
-      }
-      return bidder.bidderCode === bidderRequest.bidderCode;
+      // if (PM_Network_POC.isPubMaticBidder(bidder.bidderCode)) {
+      //   return perfName.includes(bidder.searchName) && bidder.bidderCode === bidderRequest.bidderCode;
+      //   // && bidder.reqMethod === bidderRequest?.nwMonitor?.reqMethod;
+      // }
+      return perfName.includes(bidder.searchName) && bidder.bidderCode === bidderRequest.bidderCode;
     });
   },
 
@@ -209,34 +216,36 @@ var PM_Network_POC = {
 
     for (let index = 0; index < bidderRequests.length; index++) {
       const bidderRequest = bidderRequests[index];
-      let sspConfig = PM_Network_POC.getBidderByBidRequest(bidderRequest);
-      if (!sspConfig) break;
 
       let perfResourceFound = false;
       for (let i = lastExecutionIndex; i < performanceResources.length; i++) {
         let perfResource = performanceResources[i];
 
-        if (perfResource.name.includes(sspConfig.searchName)) {
-          PM_Network_POC.lastExecutionMaxIndex = i;
-          if (PM_Network_POC.isPubMaticBidder(sspConfig.bidderCode)) {
-            const value = PM_Network_POC.getParameterByName("correlator", perfResource.name);
-            if (value == bidderRequest?.nwMonitor?.correlator) {
-              perfResourceFound = true;
-              PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, bidderRequest, bidReceived?.ext?.latency);
-              break;
-            }
-            // else {
-            //   PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, null);
-            // }
-          } else {
+        const sspConfig = PM_Network_POC.getBidder(bidderRequest, perfResource.name);
+        if (!sspConfig) continue;
+
+        //if (perfResource.name.includes(sspConfig.searchName)) {
+        PM_Network_POC.lastExecutionMaxIndex = i;
+        // console.log(bidderRequest, sspConfig);
+        if (PM_Network_POC.isPubMaticBidder(sspConfig.bidderCode)) {
+          const value = PM_Network_POC.getParameterByName("correlator", perfResource.name);
+          if (value == bidderRequest?.nwMonitor?.correlator) {
             perfResourceFound = true;
-            PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, {}, null);
+            PM_Network_POC.prepareNetworkLatencyData(perfResource, bidderRequest, bidReceived?.ext?.latency);
             break;
           }
+          // else {
+          //   PM_Network_POC.prepareNetworkLatencyData(perfResource, sspConfig, null);
+          // }
+        } else {
+          perfResourceFound = true;
+          PM_Network_POC.prepareNetworkLatencyData(perfResource, {}, null);
+          break;
         }
+        //}
       }
       if (perfResourceFound === false) {
-        PM_Network_POC.prepareNetworkLatencyData({}, sspConfig, bidderRequest, null);
+        PM_Network_POC.prepareNetworkLatencyData({}, bidderRequest, null);
       }
     }
   }
@@ -268,3 +277,11 @@ window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
     console.warn(`onEvent function is not present in window.${PM_NW_POC_PREBID_NAMESPACE} object`);
   }
 });
+
+// Cehck if translator request is override then add its entry in the bidder list.
+setTimeout(() => {
+  const dynamicBidderEntry = PM_Network_POC.bidders[1];
+  const overrideRequestConfig = window?.[PM_NW_POC_PREBID_NAMESPACE]?.getConfig()?.translatorGetRequest;
+  if (!overrideRequestConfig) return;
+  dynamicBidderEntry.searchName = overrideRequestConfig?.endPoint || dynamicBidderEntry.searchName;
+}, 0);
