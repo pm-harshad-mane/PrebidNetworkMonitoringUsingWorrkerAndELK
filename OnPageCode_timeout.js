@@ -279,6 +279,7 @@
         domain: PM_Network_POC.domain,
         publisherId: PM_Network_POC.publisherId,
         browser: PM_Network_POC.browserName,
+        timestamp: Date.now(),
         platform: PM_Network_POC.platform,
         adUnitCount: PM_Network_POC.adUnitCount,
         atLeastOneBidResUsedInAuction: sspConf.atLeastOneBidResUsedInAuction,
@@ -299,7 +300,6 @@
 
       currentBidCall.order = sspConf.bids[processedBidsCount - 1].order;
       currentBidCall.reqMethod = sspConf.bids[processedBidsCount - 1].reqMethod;
-      currentBidCall.timestamp = Date.now();
       currentBidCall.nw = {
         evaluated: {
           // percieved latency
