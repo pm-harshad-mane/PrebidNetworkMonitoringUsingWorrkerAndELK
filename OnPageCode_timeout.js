@@ -294,12 +294,11 @@
 
       if (PM_Network_POC.networkType) output['networkType'] = PM_Network_POC.networkType;
 
-      currentBidCall.method = bidderRequest?.nwMonitor?.reqMethod;
       currentBidCall.isOverride = bidderRequest?.nwMonitor?.reqOverride;
       currentBidCall.endPoint = bidderRequest?.nwMonitor?.reqEndPoint;
 
       currentBidCall.order = sspConf.bids[processedBidsCount - 1].order;
-      currentBidCall.reqMethod = sspConf.bids[processedBidsCount - 1].reqMethod;
+      currentBidCall.method = sspConf.bids[processedBidsCount - 1].reqMethod;
       currentBidCall.nw = {
         evaluated: {
           // percieved latency
