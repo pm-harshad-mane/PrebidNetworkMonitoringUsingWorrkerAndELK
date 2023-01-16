@@ -1,7 +1,5 @@
 var PM_Network_POC = {
 
-  'timeoutCorrelators': {},
-
   // IMP: Which namespace to be used, can be identify using,
   // 1. Go to publisher URL.
   // 2. Open developer tool and select console tab
@@ -151,6 +149,10 @@ var PM_Network_POC = {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
   },
 
+  isBidTimeout: function (bidderRequest) {
+    return bidderRequest?.bids?.some(bid => bid.t === 1);
+  },
+
   prepareNetworkLatencyData: function (perfResource, bidderRequest, latency) {
     let output = {
       domain: PM_Network_POC.domain,
@@ -171,7 +173,7 @@ var PM_Network_POC = {
       },
       serverLatency: latency || {},
       requestUrlPayloadLength: bidderRequest?.nwMonitor?.requestUrlPayloadLength,
-      t: PM_Network_POC.timeoutCorrelators[bidderRequest?.nwMonitor?.correlator] ? 1 : 0,
+      t: PM_Network_POC.isBidTimeout(bidderRequest) ? 1 : 0,
       db: perfResource?.name?.length ? 0 : 1
     };
 
@@ -261,8 +263,7 @@ window[PM_NW_POC_PREBID_NAMESPACE].que = window[PM_NW_POC_PREBID_NAMESPACE].que 
 window[PM_NW_POC_PREBID_NAMESPACE].que.push(function () {
   if (typeof window[PM_NW_POC_PREBID_NAMESPACE].onEvent === 'function') {
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('bidTimeout', function (args) {
-      let uniqueBiddersBids = [...new Map(args.map(item => [item['bidder'], item])).values()];
-      uniqueBiddersBids?.forEach(bid => PM_Network_POC.timeoutCorrelators[bid.correlator] = 1);
+      args?.forEach(bidRequest => bidRequest.t = 1);
     });
     window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
       var randomNumberBelow100 = Math.floor(Math.random() * 100);
