@@ -78,7 +78,7 @@
     //    3.2 In case of IDHUB only, use code, window.ihowpbjs
     // 4. Or connect to JS developer
 
-    'prebidNamespace': 'pbjs',
+    'prebidNamespace': 'owpbjs',
 
     'publisherId': 1234,
 
@@ -132,33 +132,34 @@
     ],
 
     'populateBidderDataForAuction': (bidderObj, requestObj) => {
-      if (PM_Network_POC.bidderWhiteList.includes(bidderObj.bidderCode)) {
-        if (!Object.keys(PM_Network_POC.auction).includes(bidderObj.auctionId)) {
-          PM_Network_POC.auction[bidderObj.auctionId] = {
-            bidderRequests: []
-          };
+      const currentBidderCode = bidderObj.bidderCode;
+
+      if (PM_Network_POC.bidderWhiteList.includes(currentBidderCode)) {
+        const auctionIds = Object.keys(PM_Network_POC.auction);
+        const currentAuctionId = bidderObj.auctionId;
+
+        if (!auctionIds.includes(currentAuctionId)) {
+          PM_Network_POC.auction[currentAuctionId] = { bidderRequests: [] };
 
           // attempt to remove old auction data if it has already been used
-          const auctionObjKeys = Object.keys(PM_Network_POC.auction);
-          auctionObjKeys.forEach(key => {
-            if (key !== bidderObj.auctionId && PM_Network_POC.auction[key].done) delete PM_Network_POC.auction[key]
+          auctionIds.forEach(id => {
+            if (id !== currentAuctionId && PM_Network_POC.auction[id].done) delete PM_Network_POC.auction[id]
           });
         }
 
-        PM_Network_POC.auction[bidderObj.auctionId].bidderRequests.push({
-          order: PM_Network_POC.auction[bidderObj.auctionId].bidderRequests.length + 1,
-          bidderCode: bidderObj.bidderCode,
+        PM_Network_POC.auction[currentAuctionId].bidderRequests.push({
+          order: PM_Network_POC.auction[currentAuctionId].bidderRequests.length + 1,
+          bidderCode: currentBidderCode,
           searchName: requestObj.url,
-          auctionId: bidderObj.auctionId,
+          auctionId: currentAuctionId,
           reqMethod: requestObj.method,
           reqPayloadCharCount: requestObj.data.length
         });
+        PM_Network_POC.auction[currentAuctionId].bidderResponses = [];
       }
     },
 
     'auction': {},
-
-    'bidderResponses': [],
 
     'bidderWhiteList': ['pubmatic', 'appnexus', 'triplelift', 'rubicon'],
 
@@ -202,21 +203,17 @@
     },
 
     uploadTheNetworkLatencyData: function (jsonData) {
-      // eslint-disable-next-line no-console
-      console.log('PM_Network_POC: ', PM_Network_POC);
-      // eslint-disable-next-line no-console
-      console.log('jsonData: ', jsonData);
-      // fetch('https://pm-network-latency-monitoring.harshad.workers.dev/', {
-      //   'headers': {
-      //     'content-type': 'application/json'
-      //   },
-      //   'method': 'POST',
-      //   'body': JSON.stringify(jsonData)
-      // })
-      //   .then(res => { })
-      //   .then(response => { })
-      //   // eslint-disable-next-line handle-callback-err
-      //   .catch(error => { });
+      fetch('https://pm-network-latency-monitoring.harshad.workers.dev/', {
+        'headers': {
+          'content-type': 'application/json'
+        },
+        'method': 'POST',
+        'body': JSON.stringify(jsonData)
+      })
+        .then(res => { })
+        .then(response => { })
+        // eslint-disable-next-line handle-callback-err
+        .catch(error => { });
 
       if (PM_Network_POC.auction[jsonData.auctionId].bidderRequests.length === jsonData.bidder.order) {
         PM_Network_POC.auction[jsonData.auctionId].done = true;
@@ -244,7 +241,7 @@
         timestamp: Date.now(),
         platform: PM_Network_POC.platform,
         adUnitCount: PM_Network_POC.auction[sspConf.auctionId].adUnitCount,
-        atLeastOneBidResUsedInAuction: PM_Network_POC.bidderResponses.includes(sspConf.bidderCode),
+        atLeastOneBidResUsedInAuction: PM_Network_POC.auction[sspConf.auctionId].bidderResponses.includes(sspConf.bidderCode),
         auctionId: sspConf.auctionId,
         bidder: {
           name: sspConf.bidderCode,
@@ -253,8 +250,8 @@
             isOverride: bidderRequest?.nwMonitor?.reqOverride,
             endPoint: sspConf.searchName,
             method: sspConf.reqMethod,
-            requestUrlPayloadLength: sspConf.searchName.length,
-            reqPayloadLength: sspConf.reqPayloadCharCount
+            urlLength: sspConf.searchName.length,
+            payloadLength: sspConf.reqPayloadCharCount
           }
         },
         nw: {
@@ -283,7 +280,7 @@
 
       const jsonPerfResource = JSON.stringify(perfResource);
       const raw = JSON.parse(jsonPerfResource);
-      raw.name = PM_Network_POC.removeQueryParams(perfResource.name);
+      if (perfResource?.name?.length) raw.name = PM_Network_POC.removeQueryParams(perfResource.name);
       output.nw.raw = raw;
 
       PM_Network_POC.uploadTheNetworkLatencyData(output);
@@ -291,13 +288,11 @@
 
     removeQueryParams: url => url.split('?')[0],
 
-    isPubMaticBidder: function (bidderCode) {
-      return bidderCode === 'pubmatic';
-    },
+    isPubMaticBidder: bidderCode => bidderCode === 'pubmatic',
 
     performNetworkAnalysis: function (bidderRequests, bidsReceived) {
       const auctionId = bidderRequests[0].auctionId;
-      const bidReceived = bidsReceived?.find(bidReceived => PM_Network_POC.isPubMaticBidder(bidReceived?.bidderCode));
+      const pmBidReceived = bidsReceived?.find(bidReceived => PM_Network_POC.isPubMaticBidder(bidReceived?.bidderCode));
       // latency = latency || {};
       let performanceResources = window?.performance?.getEntriesByType('resource');
       let lastExecutionIndex = PM_Network_POC.lastExecutionMaxIndex;
@@ -321,7 +316,7 @@
             const value = PM_Network_POC.getParameterByName('correlator', perfResource.name);
             if (value == bidderRequest?.nwMonitor?.correlator) {
               perfResourceFound = true;
-              PM_Network_POC.prepareNetworkLatencyData(perfResource, bidderRequest, sspConfig, bidReceived?.ext?.latency);
+              PM_Network_POC.prepareNetworkLatencyData(perfResource, bidderRequest, sspConfig, pmBidReceived?.ext?.latency);
 
               break;
             }
@@ -337,7 +332,7 @@
           // }
         }
         if (perfResourceFound === false) {
-          PM_Network_POC.prepareNetworkLatencyData({}, bidderRequest, {}, null);
+          PM_Network_POC.prepareNetworkLatencyData({}, bidderRequest, nwBidderRequest, null);
         }
       }
     }
@@ -357,7 +352,7 @@
       });
 
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('bidResponse', (bidResponse) => {
-        if (PM_Network_POC.bidderResponses.indexOf(bidResponse.bidderCode) === -1) PM_Network_POC.bidderResponses.push(bidResponse.bidderCode);
+        if (PM_Network_POC.auction[bidResponse.auctionId].bidderResponses.indexOf(bidResponse.bidderCode) === -1) PM_Network_POC.auction[bidResponse.auctionId].bidderResponses.push(bidResponse.bidderCode);
       });
 
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionInit', data => {
@@ -366,13 +361,12 @@
       });
 
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('bidTimeout', function (args) {
-        args?.forEach(bidRequest => bidRequest.t = 1);
+        if (args) args.forEach(bidRequest => bidRequest.t = 1);
       });
 
       window[PM_NW_POC_PREBID_NAMESPACE].onEvent('auctionEnd', function (data) {
         var randomNumberBelow100 = Math.floor(Math.random() * 100);
         if (randomNumberBelow100 <= PM_Network_POC.testGroupPercentage) {
-          // PM_Network_POC.adUnitCount = data.adUnits.length;
           PM_Network_POC.auction[data.auctionId].adUnitCount = data.adUnits.length;
           setTimeout(
             PM_Network_POC.performNetworkAnalysis.bind(null, data?.bidderRequests, data?.bidsReceived),
@@ -386,12 +380,4 @@
       console.warn(`onEvent function is not present in window.${PM_NW_POC_PREBID_NAMESPACE} object`);
     }
   });
-
-  // Cehck if translator request is override then add its entry in the bidder list.
-  // setTimeout(() => {
-  //   const dynamicBidderEntry = PM_Network_POC.bidderRequests[1];
-  //   const overrideRequestConfig = window?.[PM_NW_POC_PREBID_NAMESPACE]?.getConfig()?.translatorGetRequest;
-  //   if (!overrideRequestConfig) return;
-  //   dynamicBidderEntry.searchName = overrideRequestConfig?.endPoint || dynamicBidderEntry.searchName;
-  // }, 0);
 })();
