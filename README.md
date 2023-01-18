@@ -19,33 +19,67 @@ Browser (client) ---> CloudFlare Worker (server)  ----> ELK (server)
 # Sample of data stored in ELK
 ```
 {
-  "domain": "www.mumsnet.com",
-  "browser": "chrome",
-  "timestamp": 1665108035,
-  "bidders": [
-    {
-      "name": "AppNexus",
-      "key": "an",
-      "nw_dur": 333.5
+    "domain": "localhost",
+    "publisherId": 1234,
+    "browser": "chrome",
+    "timestamp": 1674035034649,
+    "platform": "desktop",
+    "adUnitCount": 2,
+    "atLeastOneBidResUsedInAuction": true,
+    "auctionId": "b867f7d4-c050-41b7-9d63-afb427c29e3f",
+    "bidder": {
+        "name": "pubmatic",
+        "order": 2,
+        "request": {
+            "isOverride": 1,
+            "endPoint": "https://openbidtest-ams.pubmatic.com/translator?source=ow-client&correlator=568",
+            "method": "POST",
+            "urlLength": 79,
+            "payloadLength": 957
+        }
     },
-    {
-      "name": "PubMatic",
-      "key": "pm",
-      "nw_dur": 220.30000007152557
+    "nw": {
+        "evaluated": {
+            "per_lt": 2363,
+            "nw_tcp": 3.400000000372529,
+            "nw_que_st": 11.200000001117587,
+            "nw_rs_wfs": 326.69999999925494,
+            "nw_cd": 2.900000000372529,
+            "nw_dur": 340.80000000074506
+        },
+        "raw": {
+            "name": "https://openbidtest-ams.pubmatic.com/translator",
+            "entryType": "resource",
+            "startTime": 5202.5999999996275,
+            "duration": 340.80000000074506,
+            "initiatorType": "xmlhttprequest",
+            "nextHopProtocol": "http/1.1",
+            "renderBlockingStatus": "non-blocking",
+            "workerStart": 0,
+            "redirectStart": 0,
+            "redirectEnd": 0,
+            "fetchStart": 5202.5999999996275,
+            "domainLookupStart": 5210.4000000003725,
+            "domainLookupEnd": 5210.4000000003725,
+            "connectStart": 5210.4000000003725,
+            "connectEnd": 5213.800000000745,
+            "secureConnectionStart": 5210.5999999996275,
+            "requestStart": 5213.800000000745,
+            "responseStart": 5540.5,
+            "responseEnd": 5543.4000000003725,
+            "transferSize": 1810,
+            "encodedBodySize": 1510,
+            "decodedBodySize": 1510,
+            "responseStatus": 200,
+            "serverTiming": []
+        }
     },
-    {
-      "name": "TripleLift",
-      "key": "tl",
-      "nw_dur": 331.59999990463257
-    }
-  ],
-  "cf_timezone": "America/Los_Angeles",
-  "cf_region": "California",
-  "cf_latitude": "37.31770",
-  "cf_longitude": "-122.04380",
-  "cf_continent": "NA",
-  "cf_city": "Cupertino",
-  "cf_country": "US",
-  "cf_colo": "SJC"
+    "serverLatency": {
+        "total_time": 31,
+        "read_request_time": 604
+    },
+    "t": 0,
+    "db": 0,
+    "networkType": "4g"
 }
 ```
